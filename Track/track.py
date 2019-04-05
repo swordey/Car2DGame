@@ -1,6 +1,5 @@
-import math
-from math import atan2
 from random import randint
+import random
 
 import numpy as np
 import pyglet
@@ -9,210 +8,185 @@ from Game.Utils import utils
 
 
 class Track:
-    def __init__(self, window, f_draw_gates = False):
-        self.window = window
-        self.draw_gates = f_draw_gates
+    """Track class
+    It generates the track lines, the reward gates, checks if car is out of operation area,
+    if collided with the track."""
+    def __init__(self, batch, width, height, draw_gates):
+        self.batch = batch
+        self.width, self.height = width, height
+        self.draw_gates = draw_gates
 
-        self.batch = pyglet.graphics.Batch()
-        self.gate = pyglet.graphics.Batch()
-        self.intsecpoints = pyglet.graphics.Batch()
-        self.vert_list = []
+        # Create containers for lines and game elements
+        self.track = []
         self.gates = []
-        self.dist = 100
-        self.dist2 = 80
+        self.track_lines = []
+        self.gate_lines = []
+        self.gate_number_per_track_number = None
+        self.inner_line_size = 0
 
-        # self.track_lines = [[10, 300, 350, 400]]
-        self.track_lines, self.gates = self.generateTrack2()
+        self.GenTrack()
 
-        self.intersection_points = []
+    # Basic functions
+    def GenTrack(self):
+        """Generate tracks with corresponding reward gates and add to drawable items
+        """
 
+        # Delete tracks if they existed
+        for track in self.track:
+            track.delete()
+
+        # Delete gates if they existed
+        if self.draw_gates:
+            for gate in self.gates:
+                gate.delete()
+
+        # Delete line arrays
+        self.track_lines = None
+        self.gate_lines = None
+
+        # Draw new track
+        self.track_lines, self.gate_lines = self._generateCircularTrack()
+
+        self.track = []
         for track_line in self.track_lines:
-            self.batch.add(2, pyglet.gl.GL_LINES, None,
-                           ('v2i', tuple(track_line)))
+            self.track.append(self.batch.add(2, pyglet.gl.GL_LINES, None,
+                           ('v2i', tuple(track_line))))
 
-        for gate in self.gates:
-            self.gate.add(2, pyglet.gl.GL_LINES, None,
-                           ('v2i', tuple(gate)))
+        self.gates = []
+        if self.draw_gates:
+            for gate in self.gate_lines:
+                self.gates.append(self.batch.add(2, pyglet.gl.GL_LINES, None,
+                               ('v2i', tuple(gate))))
 
-    def getStartingPoint(self):
+    def get_starting_point(self):
+        """Give the start point for the car
+        :return start coordinates for the car instace(s)
+        """
         return self.player_sp
 
-    def generateTrack3(self):
-        num_points_to_gen = 5
-        safety_zone = 50
-
-        points = []
-        for idx in range(num_points_to_gen):
-            points.append([randint(safety_zone,self.window.width - safety_zone),randint(safety_zone,self.window.height - safety_zone)])
-
-        points.sort(key=lambda c: atan2(self.window.width/2-c[0], self.window.height/2-c[1]))
-
-        points2 = []
-        center = np.array([np.mean(np.array(points)[:,0]),np.mean(np.array(points)[:,1])])
-        for idx in range(len(points)):
-            p = list((center + 1.5*(points[idx]-center)).astype(int))
-            points2.append(p)
-
-        lines = self.createLinesFromPoints(points)
-        lines2 = self.createLinesFromPoints(points2)
-
-        lines += lines2
-
-        return lines
-
-    def createLinesFromPoints(self,points):
-        lines = []
-        point = points[0]
-        points.remove(point)
-        while 0 < len(points):
-            best_id = 0
-            best_dist = self.distL2(point,points[best_id])
-            for p_id in range(1,len(points)):
-                cur_dist = self.distL2(point,points[p_id])
-                if cur_dist < best_dist:
-                    best_dist = cur_dist
-                    best_id = p_id
-
-            sel_point = points[best_id]
-            points.remove(sel_point)
-            lines.append([point[0],point[1],sel_point[0],sel_point[1]])
-            point = sel_point
-        lines.append([point[0],point[1],lines[0][0],lines[0][1]])
-        return lines
-
-    def distL2(self,point1,point2):
-        return np.sqrt(sum((np.array(point1)-np.array(point2))**2))
-
-    def genearateGates(self,points1,points2, width, side):
-        res = 20
-        gates = []
-        for id in range(4):
-            p1_1 = np.array(points1[id])
-            p2_1 = np.array(points2[id])
-            next_id = (id+1)%4
-            p1_2 = np.array(points1[next_id])
-            p2_2 = np.array(points2[next_id])
-            for step in range(res+1):
-                curr_p_1 = list(np.array(p1_1 + step * (p1_2-p1_1) / res).astype(int))
-                curr_p_2 = list(np.array(p2_1 + step * (p2_2-p2_1) / res).astype(int))
-                gates.append([curr_p_1[0], curr_p_1[1], curr_p_2[0], curr_p_2[1]])
-                # if 1 == side[id]:
-                #     gates.append([curr_p_1[0],curr_p_1[1],curr_p_2[0],curr_p_2[1]])
-                # else:
-                #     gates.append([curr_p[0] - width, curr_p[1] , curr_p[0] + width, curr_p[1]])
-        return gates
-
-    def generateTrack2(self):
-        width = self.window.width-120*2
-        height = self.window.height-120*2
-        thickness = 80
-
-        mid_points = list(np.array([[self.window.width/2-width/2,self.window.height/2-height/2],
-                  [self.window.width/2-width/2,self.window.height/2+height/2],
-                  [self.window.width/2+width/2,self.window.height/2+height/2],
-                  [self.window.width/2+width/2,self.window.height/2-height/2]]).astype(int))
-
-        self.player_sp = mid_points[0]
-
-        pre = [[-1,-1],[-1,1],[1,1],[1,-1]]
-        pre2 = -1*np.array(pre)
-
-        points = []
-        for p_id in range(len(mid_points)):
-            p = list(np.array(mid_points[p_id]+np.array(pre[p_id])*np.array([thickness/2,thickness/2])).astype(int))
-            points.append(p)
-
-        points2 = []
-        for p_id in range(len(mid_points)):
-            p = list(np.array(mid_points[p_id]+np.array(pre2[p_id])*np.array([thickness/2,thickness/2])).astype(int))
-            points2.append(p)
-
-        gates = self.genearateGates(points,points2, int(thickness / 2), [0, 1, 0, 1])
-
-        lines = self.createLinesFromPoints(points)
-        lines2 = self.createLinesFromPoints(points2)
-
-        lines += lines2
-
-        return lines, gates
-
-    def generateTrack(self):
-        self.dist = 80
-        self.dist2 = 160
-        line_number = 20
-        ran = 20
-
-        basic_track = [[self.dist,self.dist,self.window.width-self.dist,self.dist],
-                 [self.window.width-self.dist,self.dist,self.window.width-self.dist,self.window.height-self.dist],
-                 [self.window.width-self.dist,self.window.height-self.dist,self.dist,self.window.height-self.dist],
-                 [self.dist,self.window.height-self.dist,self.dist,self.dist],
-
-                 [self.dist2, self.dist2, self.window.width - self.dist2, self.dist2],
-                 [self.window.width - self.dist2, self.dist2, self.window.width - self.dist2, self.window.height - self.dist2],
-                 [self.window.width - self.dist2, self.window.height - self.dist2, self.dist2, self.window.height - self.dist2],
-                 [self.dist2, self.window.height - self.dist2, self.dist2, self.dist2]]
-
-        track = []
-        gate = []
-        dir_to_modify = [1,0,1,0] # 1 - up-down, 0 left-right
-        index = 0
-        for line in basic_track:
-            pushes = [randint(0,ran)-int(ran/2) for x in range(line_number)]
-            pushes[0] = 0
-            pushes[line_number-1] = 0
-            for idx in range(line_number):
-                short_line = np.array([line[0]+idx*(line[2]-line[0])/line_number,line[1]+idx*(line[3]-line[1])/line_number,
-                 line[0] + (idx+1) * (line[2] - line[0])/line_number, line[1] + (idx+1) * (line[3] - line[1])/line_number]).astype(int)
-
-                if 1 == dir_to_modify[index]:
-                    short_line += np.array([0,pushes[idx-1],0,pushes[idx]])
-                else:
-                    short_line += np.array([pushes[idx-1], 0, pushes[idx],0])
-
-                track.append(short_line)
-            index += 1
-            index = index % 4
-        return track
-
-    def draw(self):
-        self.batch.draw()
-        if self.draw_gates:
-            self.gate.draw()
-
-    def check_collision(self, player_lines):
-        for track_line in self.track_lines:
+    def check_collision(self, player_lines, interesting_gate_number):
+        """Check collision for the provided player lines
+        :argument player_lines: player lines to check the collisions with
+        :argument interesting_gate_number: id of the gate, which should be entered by the car. Therefore,
+        track lines can be selected that is close to that gate line.
+        :return true, if car collided with the track, else false"""
+        for track_line in self._get_relevant_tracklines(interesting_gate_number):
             for player_line in player_lines:
                 if utils.doIntersect(track_line[:2], track_line[2:4], player_line[0], player_line[1]):
                     return True
         return False
 
-    def isOutOfGround(self,car):
-        return not (10 <= car.x <= self.window.width-10 and 10 <= car.y <= self.window.height-10)
+    def is_out_of_ground(self, car):
+        """Check if car is outside of the operating area, which is the size of the window -10 in each side
+        :argument car: car instance that holds the position of the car
+        :return true, if car is not in the operating area, else false"""
+        return not (10 <= car.x <= self.width-10 and 10 <= car.y <= self.height-10)
 
-    def delDistPoints(self):
-        for vert in self.vert_list:
-            vert.delete()
-        self.vert_list = []
+    # Helper funtions
+    def _generateCircularTrack(self):
+        """Generate circular track lines with gates lines
+        :return track lines, gate lines"""
+        cx = self.width / 2
+        cy = self.height / 2
+        scaler = 1
+        step = 16
+        safety_dist = 50
+        lane_width = 90
+        sine_amplitude = 25
 
-    def calcIntSecPoints(self):
-        self.delDistPoints()
-        for point in self.intersection_points:
-            self.vert_list.append(self.intsecpoints.add(2, pyglet.gl.GL_LINES, None,
-                           ('v2i', tuple(point))))
+        points_in = []
+        points_out = []
 
-    def getDistances(self,car,angle_step,max_angle = 360):
-        x = car.x
-        y = car.y
-        start_angle = car.rotation
-        line_length = 100
-        self.intersection_points = []
-        car.state = np.ones([int(max_angle/angle_step)])
-        for idx in range(int(max_angle/angle_step)):
-            angle = -math.radians(start_angle-max_angle/2+idx*angle_step)
-            car_line = [x, y, int(x + line_length * np.cos(angle) + 0.5), int(y + line_length * np.sin(angle) + 0.5)]
-            for line in self.track_lines:
-                dist, point = utils.calcIntersectionPoint2(np.array(line), np.array(car_line))
-                if point is not None and point[0] >= 0 and point[1] >= 0:
-                    self.intersection_points.append(list(np.array([x,y]).astype(int))+list(np.array(point).astype(int)))
-                    car.state[idx] = dist/line_length
-        self.calcIntSecPoints()
+        sine_length = []
+        max_length = 360
+        while max_length > 0:
+            length = randint(50, 100)
+            if max_length <= 50:
+                if max_length < 30:
+                    sine_length[-1] = np.array(sine_length[-1]) + max_length
+                else:
+                    sine_length.append(max_length)
+                max_length -= max_length
+                break
+            if max_length - length > 0:
+                sine_length.append(length)
+                max_length -= length
+        sine_idx = 0
+        running_angle = 0
+
+        for angle in range(0, 360 * scaler, step):
+            rad = np.deg2rad(angle / scaler)
+            if angle > running_angle + sine_length[sine_idx]:
+                running_angle += sine_length[sine_idx]
+                sine_idx += 1
+
+            a = self.height / 2 - safety_dist - lane_width / 2 + sine_amplitude * \
+                                                                      np.sin(
+                                                                          (rad - np.deg2rad(running_angle)) * (
+                                                                          360 / sine_length[sine_idx]))
+            b = self.width / 2 - safety_dist - lane_width / 2 + sine_amplitude * \
+                                                                     np.sin(
+                                                                         (rad - np.deg2rad(running_angle)) * (
+                                                                         360 / sine_length[sine_idx]))
+
+            p = [int(np.cos(rad) * (b - lane_width / 2) + cx + 0.5),
+                 int(np.sin(rad) * (a - lane_width / 2) + cy + 0.5)]
+            p2 = [int(np.cos(rad) * (b + lane_width / 2) + cx + 0.5),
+                  int(np.sin(rad) * (a + lane_width / 2) + cy + 0.5)]
+
+            points_in.append([p[0], p[1]])
+            points_out.append([p2[0], p2[1]])
+
+        self.gate_number_per_track_number = int(len(points_in) / 45 + 0.5)
+        gates = self._generate_gates_for_every_xth_point(points_in, points_out, self.gate_number_per_track_number)
+
+        self.player_sp = (np.array(points_in[0]) + np.array(points_out[0])) / 2
+
+        lines_in = self._create_lines_from_points(points_in)
+        self.inner_line_size = len(lines_in)
+        lines_out = self._create_lines_from_points(points_out)
+        lines_in += lines_out
+        return lines_in, gates
+
+    def _generate_gates_for_every_xth_point(self, inner_points, outer_points, every_xth):
+        """Generate gates for every xth point of track
+        :argument inner_points: points of the inner part of the track
+        :argument outer_points: points of the outer part of the track
+        :argument every_xth: every which x should have gates from the track points
+        Note: it has to be at least 1 and integer
+        :return gate lines
+        """
+        gates = []
+        cnt = 0
+        for i, o in zip(inner_points, outer_points):
+            if cnt % every_xth == 0:
+                gates.append([i[0],i[1],o[0],o[1]])
+            cnt += 1
+        return gates
+
+    def _create_lines_from_points(self, points):
+        """Create lines from the provided points, which should create a closed loop
+        :argument points: to create the lines from
+        :return created closed loop lines
+        """
+        lines = []
+        for idx in range(len(points)-1):
+            lines.append([points[idx][0],points[idx][1],points[idx+1][0],points[idx+1][1]])
+        lines.append([points[-1][0], points[-1][1], points[0][0], points[0][1]])
+        return lines
+
+    def _get_relevant_tracklines(self, gate_number):
+        """Get the track lines that is close to the provided gate_number
+        :argument gate_number: the gate id, where the track lines should be looked for.
+        :return relevant track lines"""
+        relevant_track_id = gate_number * self.gate_number_per_track_number
+        first_id = (relevant_track_id - 2 * self.gate_number_per_track_number)%self.inner_line_size
+        second_id = (relevant_track_id + 2 * self.gate_number_per_track_number)%self.inner_line_size
+        if second_id > first_id:
+            return self.track_lines[first_id:second_id] + \
+                   self.track_lines[first_id + self.inner_line_size:second_id + self.inner_line_size]
+        else:
+            return self.track_lines[first_id:self.inner_line_size] + self.track_lines[:second_id] + \
+                   self.track_lines[self.inner_line_size+first_id:] + \
+                   self.track_lines[self.inner_line_size:second_id+self.inner_line_size]
+

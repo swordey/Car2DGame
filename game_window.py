@@ -208,15 +208,3 @@ class GameWindow(pyglet.window.Window):
         :return true if the specified cars are died, else false"""
         dies = [car.died or car.won for car in self.get_cars(ids)]
         return sum(dies) == len(dies)
-
-
-
-
-
-    # Game window functions
-
-
-
-
-
-

@@ -104,11 +104,16 @@ class Car(BaseSprite):
             reward = -10
             self.reward = reward
 
-        # Check if we hit score 100 or we are below -500
-        if self.score == self.num_of_gates * self.lapse_to_won or reward <= -10:
-            reward = -10
+        # Check if we hit score 100 or we are below -10
+        if self.score == self.num_of_gates * self.lapse_to_won:
             self.reward = reward
             self.won = True
+
+        if reward <= -10:
+            reward = -10
+            self.reward = reward
+            self.died = True
+
 
         if self.track.is_out_of_ground(self):
             reward = max(-10,reward)

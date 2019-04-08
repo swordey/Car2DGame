@@ -160,6 +160,12 @@ class GameWindow(pyglet.window.Window):
         """
         self.max_frames_of_game = game_length
 
+    def cancel_die_by_time(self):
+        """Turn off die by time
+        Time reduces the car reward, so if car does not do anything, it will die."""
+        for car in self.get_cars():
+            car.cancel_time_punishment()
+
     # Game Logic Functions
     def reset(self):
         """Resets the game

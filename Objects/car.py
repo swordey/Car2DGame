@@ -1,7 +1,6 @@
 import math
 
 import numpy as np
-import pyglet
 
 from Game.Objects.base_sprite import BaseSprite
 from Game.Utils import utils
@@ -46,6 +45,8 @@ class Car(BaseSprite):
         self.last_reward = 0
         self.reward = 0
         self.steps = 0
+
+        self.time_punishment = False
 
     # Basic functionality
     def reset(self):
@@ -144,6 +145,11 @@ class Car(BaseSprite):
         :argument lapse_to_won: value to set"""
         self.lapse_to_won = lapse_to_won
 
+    def cancel_time_punishment(self):
+        """Turn off time punishment
+        Time reduces reward, which can kill car."""
+        self.time_punishment = False
+
     # Helper functions
     def _move(self, dt):
         """Moves the car with its speed with the provided time increment
@@ -175,7 +181,8 @@ class Car(BaseSprite):
         It is calculated from the passed reward gates and the used step number
         """
         self.last_reward = self.reward
-        self.reward -= 0.2
+        if self.time_punishment:
+            self.reward -= 0.2
         if self._next_gate_passed():
             self.reward += 10
 

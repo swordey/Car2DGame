@@ -59,6 +59,9 @@ game.set_car_number(1, ray_angles, lapse_until_won=5)
 # Set length of the game
 game.set_game_length(episodes)
 
+# Cancel die by time (time -> reduces reward -> below certain reward car dies)
+game.cancel_die_by_time()
+
 game.reset()
 
 if __name__ == "__main__":
